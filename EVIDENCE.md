@@ -179,9 +179,43 @@ waiting for Touch ID.
 
 `security trust-settings-import` is silent only when the imported list is **identical** to the
 current one; a real modification through it prompts in the same way. There is therefore no
-unattended way to change trust settings, and `lib-trust.sh` now refuses to attempt one unless
-`POC_ALLOW_TRUST_CHANGE=1` is set, so a script fails fast and explains rather than blocking on a
-GUI dialog.
+unattended way to change trust settings **from the command line**, and `lib-trust.sh` now refuses
+to attempt one unless `POC_ALLOW_TRUST_CHANGE=1` is set, so a script fails fast and explains
+rather than blocking on a GUI dialog.
+
+The dialog is a property of the caller, not of the operation. `trustd` holds the entitlement
+check, and its own strings name both the requirement and the reason for the fallback:
+
+```
+trustsettings.read
+trustsettings.write
+com.apple.trust-settings.user
+com.apple.trust-settings.admin
+system trust settings are not modifiable
+invalid trust settings domain
+%@: %@ lacks entitlement %@
+AuthorizationCopyRights failure
+```
+
+Absent the entitlement, the write path fails `AuthorizationCopyRights`, and that failure is what
+raises the dialog. A caller holding `com.apple.trust-settings.user` (or `.admin`, which is what
+allows a change in the *system* domain) sets the same state with no authorization step.
+`CertificateService`, the profile installer, holds both, together with
+`com.apple.private.system-keychain`:
+
+```
+[Key] com.apple.keystore.access-keychain-keys
+        [String] com.apple.trust-settings.user
+        [String] com.apple.trust-settings.admin
+[Key] com.apple.private.system-keychain
+[Key] keychain-access-groups
+```
+
+It applies trust through exactly the keys the local call sets — `kSecTrustSettingsPolicy`,
+`kSecTrustSettingsResult`, `kSecTrustSettingsAllowedError`, `kSecTrustSettingsPolicyName` — and
+verifies the result afterwards ("Verification of SetTrustSettings failed for '%@'"). The
+Certificate payloads (`com.apple.security.root`, `com.apple.security.pkcs12`) are therefore the
+supported unattended route to the trust state this POC establishes by hand (F20).
 
 ---
 
@@ -352,7 +386,7 @@ is intended, the pin must be stated explicitly.
 
 ---
 
-## 6. Enterprise deployment: System keychain and privilege management (F4, F5, F6, F13, F14)
+## 6. Enterprise deployment: System keychain and privilege management (F4, F5, F6, F13, F14, F20)
 
 ### 6.1 Protection of a System keychain item
 
@@ -393,11 +427,24 @@ is not sufficient.
    MDM-initiated flow already holds the admin authorization, and the ACL is written
    atomically with the key.
 
-3. **No MDM configuration profile can set a keychain ACL.** The payload key definitions in
-   `ManagedConfiguration.framework` expose nothing for keychain ACLs or partition lists.
-   MDM installs the identity; the ACL is whatever the installing code decided. This is a
-   gap in the management tooling and the reason privilege-management products are reached
-   for.
+3. **No MDM configuration profile can set a *keychain item* ACL, or a partition list.** The
+   payload definitions expose nothing for either. MDM installs the identity; the item's ACL
+   is whatever the installing code decided. This is a gap in the management tooling and the
+   reason privilege-management products are reached for.
+
+   The claim needs one qualification, because the profile machinery does build keychain
+   ACLs — just not this kind. `CertificateService` calls `SecAccessCreate`,
+   `SecACLCreateWithSimpleContents` and `SecACLUpdateAuthorizations`, and logs
+   `Creating ACL '%@' with: %@ apps` / `Creating ACL 'AllowAllApps'`, so a profile *can*
+   restrict which applications may use an imported certificate's private key. But the
+   applications come from an `addlTrustedApps` array of bundle identifiers or app-group
+   identifiers (`Unable to create SecTrustedApplicationRef for app group '%s'`), the ACL
+   belongs to the certificate's `CreateCertAccess`, and the path contains no call to
+   `SecTrustedApplicationCreateFromRequirement`. A profile can therefore pin a certificate
+   to named applications, but it cannot express a signer *requirement*, and it cannot set
+   an item's ACL. F6 stands, narrowed to what it actually asserts.
+
+   The same component is the unattended route to trust settings (F20, §3).
 
 4. **The privilege-management policy becomes part of the trusted computing base.** If the
    allowlist permits an end user to run any command able to rewrite the ACL — `security`,
@@ -980,7 +1027,10 @@ correct configuration appear broken or a broken one appear correct.
   which point every deletion fails as ambiguous. Delete by SHA-1 instead.
 - **ANY change to the trust store raises a Touch ID / password dialog**, including a
   first-time `add-trusted-cert`. `trust-settings-import` is silent only when the list is
-  unchanged. There is no unattended path, so scripts must refuse rather than attempt it.
+  unchanged. There is no unattended path **from the command line**, so scripts must refuse
+  rather than attempt it. The dialog is the fallback `trustd` takes when the caller lacks
+  `com.apple.trust-settings.user`/`.admin`, not a property of the operation: a Certificate
+  payload sets the same trust state with no authorization step (F20).
 - **A private-CA chain must be trusted or `codesign` refuses to sign**, reporting
   `errSecInternalComponent` with a `leaf MissingIntermediate` log entry. Two conditions are
   required: the root present in a keychain that trustd searches (the login keychain works; a

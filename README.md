@@ -19,11 +19,6 @@ Two classes of evidence are used, and they are not equivalent:
   artifacts such as provisioning profiles, because the behaviour could not be exercised
   without an Apple Developer account.
 
-The distinction matters here more than usual: the *recommended* design rests substantially
-on the second class, while the *alternative* is almost entirely the first. §7 lists
-everything not established by measurement, and the findings table in §2 marks the basis of
-each item.
-
 All measurements were taken on macOS 26.6.2 (build 25G83), arm64, OpenSSL 3.6.4, command
 line tools only, none requiring `sudo`.
 
@@ -91,14 +86,31 @@ be pinned to a code requirement instead:
 
 ### 1.4 A note on trust settings, for the alternative path
 
-Establishing a trust setting for a CA raises an authorization dialog (Touch ID or the login
-password) **every time it changes**, including the first time — measured. There is no unattended
-way to do it, and `trust-settings-import` prompts on any real modification too. So trust must be
-established once, interactively, and the CA must not be regenerated afterwards: regenerating it
-invalidates the trust and prompts again. The scripts in this repository refuse to modify trust
-settings unless `POC_ALLOW_TRUST_CHANGE=1` is set, so an unattended run fails with an explanation
-instead of hanging on a dialog. This is a one-time setup cost on the ACL-based alternative; the
-recommended Secure Enclave path does not involve user trust settings at all.
+Trust settings are the one part of the alternative path that **cannot be established
+unattended from the command line, but can be established unattended through MDM.**
+
+Locally, establishing a trust setting for a CA raises an authorization dialog (Touch ID or the
+login password) **every time it changes**, including the first time — measured. `trust-settings-import`
+prompts on any real modification too, and no command-line option avoids it. So on an unmanaged
+machine trust must be established once, interactively,
+and the CA must not be regenerated afterwards, because that invalidates the trust and prompts
+again. The scripts in this repository refuse to modify trust settings unless
+`POC_ALLOW_TRUST_CHANGE=1` is set, so an unattended run fails with an explanation instead of
+hanging on a dialog.
+
+The dialog is not intrinsic to the operation. It is the fallback that `trustd` takes when the
+caller lacks the `com.apple.trust-settings.user` (or `.admin`) entitlement: absent the
+entitlement it fails `AuthorizationCopyRights`, which is what raises the dialog. A payload
+installer holds the entitlement and therefore sets trust silently. The Certificate payload
+(`com.apple.security.root`, and the trust block of `com.apple.security.pkcs12`) carries exactly
+the `kSecTrustSettingsPolicy`, `kSecTrustSettingsResult` and `kSecTrustSettingsAllowedError`
+values that the local call sets, so the same trust state is reachable from a profile with no user
+present (F20). **Deploying the CA by profile is the supported answer to this step.**
+
+Two limits on that. The profile path requires MDM or supervised local profile installation, and
+it installs trust rather than a keychain ACL: it does not remove the need for §1.2 step 5 or the
+§1.2 step 6 constraint. And the recommended Secure Enclave path involves no user trust settings
+at all, so this note applies only to the alternative.
 
 ### 1.5 Sequencing
 
@@ -107,11 +119,6 @@ independent alternative reachable without an account. Step 8 is a precondition f
 integrity of either, and is the load-bearing step because it is the one most easily assumed
 to be unnecessary: on an unmanaged machine, an ACL and a hardened binary are both defeated
 by the same person they are intended to constrain.
-
-Corollary: **the security of the key reduces to the security of the enrolment.** If the
-key's access control derives its integrity from the management plane, then compromising the
-enrolment compromises the key, and the durability of the enrolment is in scope for the
-design rather than being an infrastructure detail.
 
 ---
 
@@ -124,7 +131,7 @@ design rather than being an infrastructure detail.
 | F3 | Is the pin a hard boundary? | **no** | the ACL entry is `(requirement matches) OR (user approves)`, and no "never prompt" flag exists | `run-aclstruct.sh`, `run-prompt-approval.sh` |
 | F4 | Does the System keychain make the pin tamper-proof? | **only against non-admins** | the store is `0600 root:wheel` and writes require an admin authorization, which a local admin holds | `system.keychain.modify` rule |
 | F5 | Can a privilege-management tool install the ACL as root? | **not without authentication** | `system.keychain.modify` is `allow-root=false` with `authenticate-user=true` in group `admin` | `system.keychain.modify` rule |
-| F6 | Can MDM set a keychain item ACL? | **no** | no payload key exists for keychain ACLs or partition lists | `run-profile.sh` |
+| F6 | Can MDM set a keychain item ACL, or a partition list? | **no** | no payload key for a keychain item ACL or partition list; the profile machinery reaches `SecAccessCreate` only for the *certificate's* trusted-application list, and offers no requirement-based option (F20) | decoded `CertificateService` |
 | F7 | Is a code-identity pin effective against injected code? | **no, unless hardened** | signatures do not cover `dlopen`ed libraries; hardened runtime plus library validation prevents it | `run-injection.sh` |
 | F8 | Can a Secure Enclave key be pinned to a binary? | **no** | SE access control has no code-identity field; the nearest equivalent is a team access group | `run-se.sh` |
 | F9 | Can a persistent SE key be created without an Apple account? | **no** | `keychain-access-groups` is a restricted entitlement; AMFI terminates signatures it cannot chain to Apple | `run-se.sh` |
@@ -138,6 +145,7 @@ design rather than being an infrastructure detail.
 | F17 | Can the ACL prompt be removed, leaving a requirement-only entry? | **no** | `SecAccessCreateFromOwnerAndACL` accepts a prompt-free ACL, but the keychain service re-derives a `cdhash` entry for the creating process on write | `run-extraction.sh`, EVIDENCE §4.2 |
 | F18 | Does an SE key require user interaction? | **no, unless a presence gate is requested** | `gate=none` and `gate=privateusage` both sign with no interaction; the presence flags are opt-in | `run-se.sh` |
 | F19 | Is the data-protection keychain scoped by code requirement? | **no** | `kSecAttrAccess` is documented macOS-only under *legacy* item attributes; the modern path uses `kSecAttrAccessGroup` | SDK headers, decoded profiles |
+| F20 | Can MDM establish CA trust, and a certificate's trusted-application list, without a dialog? | **yes** | `trustd` skips its authorization when the caller carries `com.apple.trust-settings.user`/`.admin`, which the profile installer does; the Certificate payload carries `kSecTrustSettings*` keys and an `addlTrustedApps` list, and `CertificateService` builds those ACLs itself | decoded `trustd` and `CertificateService`, Apple payload documentation |
 
 F3, F16, F17 and F19 are the findings that determine the design. F16 and F17 together are
 the reason the ACL is not a complete control: it neither prevents extraction nor omits the
@@ -462,9 +470,16 @@ does not follow that an administrator is unable to alter it — see §6.5. This 
 should be created with its final ACL during installation or via MDM, where the authorisation is
 already satisfied, rather than corrected afterwards from a root agent.
 
-Because no MDM payload key can set a keychain ACL (F6), MDM installs the identity and the ACL is
-whatever the installing code chose. This gap is the reason privilege-management tooling is
-reached for at all, and it has a direct consequence:
+No MDM payload key can set a *keychain item* ACL or partition list (F6), so for the
+ACL-pinned key MDM installs the identity and the ACL is whatever the installing code chose.
+The profile machinery does build keychain ACLs — `CertificateService` calls `SecAccessCreate`
+and `SecACLCreateWithSimpleContents` for imported identities — but only to attach the
+certificate's trusted-application list, and only from an `addlTrustedApps` array of bundle
+identifiers or app-group identifiers. There is no requirement-based option anywhere in that
+path: the SPI this repository depends on (`SecTrustedApplicationCreateFromRequirement`) is
+never called by it. So a profile can pin a *certificate* to named applications, but it cannot
+express the signer requirement, and it cannot set an item's ACL. That gap is the reason
+privilege-management tooling is reached for at all, and it has a direct consequence:
 
 > **The privilege-management policy becomes part of the trusted computing base.** The tool that
 > installs the ACL is the tool that can remove it. If the allowlist permits an end user to run
@@ -527,7 +542,7 @@ The requirement persists into the stored item and is retrievable with
 
 These mechanics belong to the legacy **file** keychain. The item must be created in, or moved
 to, a file keychain for `kSecAttrAccess` to apply; the data-protection keychain scopes access by
-entitlement access group instead (EVIDENCE §3, §9.3).
+entitlement access group instead (EVIDENCE §3, EVIDENCE §9.3).
 
 ### 6.4 Controls required on either path
 
@@ -675,7 +690,11 @@ AMFI, code injection, ACL prompt behaviour, key extraction, and the permission b
 authorization rules governing the System keychain.
 
 **Decoded from artifacts.** The provisioning-profile structure in §3.3 and §5.1 was extracted
-from installed applications with `run-profile.sh` and `security cms -D`.
+from installed applications with `run-profile.sh` and `security cms -D`. The payload and
+trust-setting behaviour in F6 and F20 was decoded from the system binaries that implement it —
+`/usr/libexec/trustd` for the entitlement that gates a trust-settings write, and
+`ConfigurationProfiles.framework/XPCServices/CertificateService.xpc` for the payload keys, the
+trust values applied, and the ACL construction described in §6.2.
 
 **Documented by the vendor.** The claims in §6.5 come from vendor documentation rather than
 measurement, because the machine used for this work is not MDM-enrolled
@@ -689,6 +708,7 @@ behaviour described.
 | Secure token, bootstrap token, volume ownership | Apple, *Apple Platform Deployment* — "Use secure token, bootstrap token, and volume ownership in deployments" |
 | Endpoint privilege management model; macOS authorization request matching; agent protection | BeyondTrust, *Endpoint Privilege Management for Windows and Mac* — "Application definitions and types (macOS)", "Policy editor utilities", "Uninstall EPM clients and adapters" |
 | Access-control flag semantics | `Security/SecAccessControl.h`; `Security/SecItem.h` for the legacy-versus-data-protection attribute distinction |
+| Certificate and trust payload keys; unattended trust establishment | Apple, *Device Management* — `com.apple.security.root` and `com.apple.security.pkcs12` payload documentation; corroborated by decoding `trustd` and `CertificateService` |
 
 `tools/fetch_apple_doc.py` and `tools/fetch_readme_doc.py` retrieve and extract the text of those
 documentation pages, so the quotations in §6.5 can be re-derived rather than taken on trust.
