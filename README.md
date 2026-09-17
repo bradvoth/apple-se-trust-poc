@@ -90,13 +90,12 @@ Trust settings are the one part of the alternative path that **cannot be establi
 unattended from the command line, but can be established unattended through MDM.**
 
 Locally, establishing a trust setting for a CA raises an authorization dialog (Touch ID or the
-login password) **every time it changes**, including the first time — measured. `trust-settings-import`
-prompts on any real modification too, and no command-line option avoids it. So on an unmanaged
-machine trust must be established once, interactively,
-and the CA must not be regenerated afterwards, because that invalidates the trust and prompts
-again. The scripts in this repository refuse to modify trust settings unless
-`POC_ALLOW_TRUST_CHANGE=1` is set, so an unattended run fails with an explanation instead of
-hanging on a dialog.
+login password) **every time it changes**, including the first time — measured.
+`trust-settings-import` prompts on any real modification too, and no command-line option avoids
+it. On an unmanaged machine, trust must therefore be established once, interactively, and the CA
+must not be regenerated afterwards, because that invalidates the trust and prompts again. The
+scripts in this repository refuse to modify trust settings unless `POC_ALLOW_TRUST_CHANGE=1` is
+set, so an unattended run fails with an explanation instead of hanging on a dialog.
 
 The dialog is not intrinsic to the operation. It is the fallback that `trustd` takes when the
 caller lacks the `com.apple.trust-settings.user` (or `.admin`) entitlement: absent the
@@ -105,18 +104,18 @@ installer holds the entitlement and therefore sets trust silently. The Certifica
 (`com.apple.security.root`, and the trust block of `com.apple.security.pkcs12`) carries exactly
 the `kSecTrustSettingsPolicy`, `kSecTrustSettingsResult` and `kSecTrustSettingsAllowedError`
 values that the local call sets, so the same trust state is reachable from a profile with no user
-present (F20). **Deploying the CA by profile is the supported answer to this step.**
+present (F20). **Deploying the CA by profile is the supported method for this step.**
 
-Two limits on that. The profile path requires MDM or supervised local profile installation, and
+Two constraints apply. The profile path requires MDM or supervised local profile installation, and
 it installs trust rather than a keychain ACL: it does not remove the need for §1.2 step 5 or the
-§1.2 step 6 constraint. And the recommended Secure Enclave path involves no user trust settings
-at all, so this note applies only to the alternative.
+§1.2 step 6 constraint. The recommended Secure Enclave path involves no user trust settings at
+all, so this note applies only to the alternative.
 
 ### 1.5 Sequencing
 
 Steps 1–3 constitute the recommended design; step 4 is its precondition. Steps 5–7 are an
 independent alternative reachable without an account. Step 8 is a precondition for the
-integrity of either, and is the load-bearing step because it is the one most easily assumed
+integrity of either, and is the critical step because it is the one most easily assumed
 to be unnecessary: on an unmanaged machine, an ACL and a hardened binary are both defeated
 by the same person they are intended to constrain.
 
@@ -257,8 +256,8 @@ Both are team-level and stable across certificate and binary rotation, which is 
 survives renewal. Where the account is in use, the leaf is issued under the Developer ID
 identity so that one certificate serves both mechanisms.
 
-The two mechanisms draw on different certificate paths, and only one of them involves a CA
-you operate:
+The two mechanisms draw on different certificate paths, and only one of them involves a
+privately operated CA:
 
 - **Recommended path (Secure Enclave, access group).** The leaf is a Developer ID certificate.
   Access is granted by the `keychain-access-groups` entitlement, and that entitlement is
@@ -297,12 +296,12 @@ Two consequences follow, and both are the properties the design depends on:
 
 - **The group string is chosen by the team and is stable.** A rebuilt binary declaring the
   same group reaches the same key. No re-pinning is required, at any rotation frequency.
-- **Cross-team access is refused.** A binary from another team cannot declare your prefix,
+- **Cross-team access is refused.** A binary from another team cannot declare that prefix,
   because the prefix is not authorised by *its* profile.
 
-The scope is the **team**, not a binary or a certificate hash. This is intentional: it makes
-binary rotation free, at the cost of per-binary granularity. Compare the alternatives by what
-invalidates them:
+The scope is the **team**, not a binary or a certificate hash. This is intentional: binary
+rotation requires no action, at the cost of per-binary granularity. The alternatives are
+compared by what invalidates them:
 
 | scope | invalidated by |
 |---|---|
@@ -336,8 +335,8 @@ gate=privateusage   VERDICT: SECURE ENCLAVE  SIGN OK -> no user interaction requ
 
 The presence gates exist for the opposite use case — SE keys backing operations a human
 authorises, such as payments or unlocking a credential store — where requiring proof of presence
-is the point. They are capabilities, not a tax on SE keys, and an unattended signer simply does
-not select them.
+is the point. They are capabilities rather than requirements, and an unattended signer does not
+select them.
 
 ### 5.3 Code requirement (ACL-based alternative)
 
@@ -380,7 +379,7 @@ authorizes it, which is a property of how the ACL was constructed rather than of
                             [1] ACLAuthorizationChangeACL
 ```
 
-There is no `ExportClear` entry at all. But the key material still lives in the keychain
+There is no `ExportClear` entry at all. The key material nevertheless remains in the keychain
 container, and a container-level read consults no ACL: an administrator reading
 `/var/db/SystemKey`, or anyone who can open the keychain with its password, obtains the key.
 A Secure Enclave key is generated in and never leaves the SEP, so that route does not exist.
@@ -497,8 +496,8 @@ and `SecACLCreateWithSimpleContents` for imported identities — but only to att
 certificate's trusted-application list, and only from an `addlTrustedApps` array of bundle
 identifiers or app-group identifiers. There is no requirement-based option anywhere in that
 path: the SPI this repository depends on (`SecTrustedApplicationCreateFromRequirement`) is
-never called by it. So a profile can pin a *certificate* to named applications, but it cannot
-express the signer requirement, and it cannot set an item's ACL. That gap is the reason
+never called by it. A profile can therefore pin a *certificate* to named applications, but it
+cannot express the signer requirement, and it cannot set an item's ACL. That gap is the reason
 privilege-management tooling is reached for at all, and it has a direct consequence:
 
 > **The privilege-management policy becomes part of the trusted computing base.** The tool that
@@ -570,19 +569,19 @@ entitlement access group instead (EVIDENCE §3, EVIDENCE §9.3).
 
 ```
 BINARY                             INJECTED CODE                     PROCESS RESULT
-plainly signed, no runtime         signed 256 bytes -> obtained key  GRANTED
+signed, no runtime                 signed 256 bytes -> obtained key  GRANTED
 signed --options runtime           not loaded (injection blocked)    GRANTED
 ```
 
-The injected library is unsigned and chains to no CA. Injected into a plainly signed binary it
-signs successfully with the pinned key. The same binary signed with `--options runtime` retains
-its own access while refusing the foreign library, because the hardened runtime makes dyld ignore
-`DYLD_INSERT_LIBRARIES` and enables library validation. Do not add
-`com.apple.security.cs.allow-dyld-environment-variables` or
-`...disable-library-validation`. On the recommended path this is not defence in depth but the
-primary control, because there is no per-binary pin behind it.
+The injected library is unsigned and chains to no CA. Injected into a binary signed without the
+hardened runtime, it signs successfully with the pinned key. The same binary signed with
+`--options runtime` retains its own access while refusing the foreign library, because the
+hardened runtime makes dyld ignore `DYLD_INSERT_LIBRARIES` and enables library validation.
+Neither `com.apple.security.cs.allow-dyld-environment-variables` nor
+`...disable-library-validation` should be added. On the recommended path this is not defence in
+depth but the primary control, because there is no per-binary pin behind it.
 
-### 6.5 What actually constrains an administrator
+### 6.5 What constrains an administrator
 
 The keychain ACL, considered alone, is defeated by an administrator who can satisfy
 `system.keychain.modify` (measured, §6.2). On a file keychain, root or an equivalent reader of
@@ -602,9 +601,9 @@ enrolment, not the administrator bit.
 | MDM restrictions | can prevent an administrator "from creating new users in Users & Groups", prevent changing account settings, prevent manually installing configuration profiles, and require an administrator password to install or update apps | same, *Restrictions for Mac* |
 | Bootstrap token | escrowed to MDM at first secure-token login; enables supervision, silent Erase All Content and Settings, and authorizing software updates | same, *Use secure and bootstrap tokens* |
 
-The first row is decisive: removing an endpoint agent or rewriting an ACL achieves nothing
-durable, because the device remains managed. "The user has `sudo`" and "the user can leave the
-management plane" are different statements.
+The first row determines the outcome: removing an endpoint agent or rewriting an ACL achieves
+nothing durable, because the device remains managed. "The user has `sudo`" and "the user can
+leave the management plane" are different statements.
 
 **Endpoint agents close the gap identified in §6.2.** The ACL is gated by an authorization right
 that an administrator can satisfy, serviced through macOS Authorization Services, and the
@@ -670,8 +669,8 @@ account; the next two for want of administrator rights; the last is a documentat
    access group. Assert `tkid = com.apple.setoken` and that export is refused.
 2. Sign two binaries declaring the same group; confirm both use the key with no interaction.
 3. Sign a third binary declaring a group *not* under the team prefix; confirm it is refused.
-4. Rebinary one binary with a new certificate and confirm unchanged access — this is the rotation
-   property the design depends on.
+4. Re-sign one binary with a new certificate and confirm that access is unchanged; this is the
+   rotation property the design depends on.
 5. Confirm no keychain prompt is reachable, by running a non-declaring binary and checking that it
    fails outright rather than offering a dialog.
 

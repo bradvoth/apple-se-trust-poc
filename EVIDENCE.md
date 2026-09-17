@@ -257,7 +257,7 @@ shown above.
 
 ### 4.1 What approving the prompt does (measured)
 
-Whether approval actually hands over the key had not been established, and the claim
+Whether approval hands over the key had not been established, and the claim
 "the pin restricts silent access only" depends on it. `./run-prompt-approval.sh` settles it.
 
 The test pins a key to **signedA's leaf certificate only** and then runs `signedB`, which
@@ -322,9 +322,9 @@ requirement; reading it back with `SecKeychainItemCopyAccess` shows the substitu
 keychain service re-derives ACL entries for the creating process on write. Reproduce with
 `./bin/pocsetup mkkeycssm <keychain> <label> '<requirement>'`.
 
-The ACL is therefore best understood as *user-mediated* rather than *policy-enforced*. Hard
-enforcement that survives a user being persuaded to approve requires the key to reside
-somewhere the untrusted process cannot query at all.
+The ACL is therefore best understood as *user-mediated* rather than *policy-enforced*.
+Enforcement that survives a user being persuaded to approve requires the key to reside
+somewhere the untrusted process cannot query.
 
 ---
 
@@ -432,17 +432,17 @@ is not sufficient.
    is whatever the installing code decided. This is a gap in the management tooling and the
    reason privilege-management products are reached for.
 
-   The claim needs one qualification, because the profile machinery does build keychain
-   ACLs — just not this kind. `CertificateService` calls `SecAccessCreate`,
+   The claim requires one qualification, because the profile machinery does build keychain
+   ACLs, though not this kind. `CertificateService` calls `SecAccessCreate`,
    `SecACLCreateWithSimpleContents` and `SecACLUpdateAuthorizations`, and logs
    `Creating ACL '%@' with: %@ apps` / `Creating ACL 'AllowAllApps'`, so a profile *can*
-   restrict which applications may use an imported certificate's private key. But the
-   applications come from an `addlTrustedApps` array of bundle identifiers or app-group
-   identifiers (`Unable to create SecTrustedApplicationRef for app group '%s'`), the ACL
+   restrict which applications may use an imported certificate's private key. The
+   applications, however, come from an `addlTrustedApps` array of bundle identifiers or
+   app-group identifiers (`Unable to create SecTrustedApplicationRef for app group '%s'`), the ACL
    belongs to the certificate's `CreateCertAccess`, and the path contains no call to
    `SecTrustedApplicationCreateFromRequirement`. A profile can therefore pin a certificate
    to named applications, but it cannot express a signer *requirement*, and it cannot set
-   an item's ACL. F6 stands, narrowed to what it actually asserts.
+   an item's ACL. F6 stands, narrowed to what it asserts.
 
    The same component is the unattended route to trust settings (F20, §3).
 
@@ -493,8 +493,8 @@ Enrollment:
 and, on the enrolment profile itself, that organisations have "the option to prevent the user
 from removing the device management service's enrollment profile".
 
-This is the decisive fact. An administrator who removes an endpoint agent or rewrites an ACL
-does not thereby leave the management plane; the device remains supervised and its
+This fact determines the outcome. An administrator who removes an endpoint agent or rewrites an
+ACL does not thereby leave the management plane; the device remains supervised and its
 configuration is reasserted. Removing an agent is therefore not equivalent to unenrolling,
 and a `sudo`-capable user is not necessarily a user who can escape management.
 
@@ -575,17 +575,17 @@ pocclient-signedA (no runtime)     signed 256 bytes -> obtained key  GRANTED
 pocclient-hardA (hardened runtime) not loaded (injection blocked)    GRANTED
 ```
 
-`bin/libinject.dylib` is unsigned and chains to no CA. Injected into the plainly signed
-binary it signs successfully with the pinned key. The same binary signed with
+`bin/libinject.dylib` is unsigned and chains to no CA. Injected into a binary signed without
+the hardened runtime, it signs successfully with the pinned key. The same binary signed with
 `--options runtime` retains its own access while refusing the foreign library, because the
 hardened runtime makes dyld ignore `DYLD_INSERT_LIBRARIES` and enables library validation.
 
-Signing the client with the hardened runtime and library validation is therefore required.
-It is required for notarization in any case, so it imposes no additional cost in a normal
-build pipeline. Do not add `com.apple.security.cs.allow-dyld-environment-variables` or
-`com.apple.security.cs.disable-library-validation` to that binary. Without the hardened
-runtime the pin certifies which binary is running, not what code is running within that
-process.
+Signing the client with the hardened runtime and library validation is therefore required. It
+is required for notarization in any case, so it imposes no additional cost in a normal build
+pipeline. Neither `com.apple.security.cs.allow-dyld-environment-variables` nor
+`com.apple.security.cs.disable-library-validation` should be added to that binary. Without the
+hardened runtime the pin certifies which binary is running, not what code is running within
+that process.
 
 ---
 
@@ -675,7 +675,7 @@ gate=privateusage   VERDICT: SECURE ENCLAVE  SIGN OK -> no user interaction requ
 ```
 
 The presence gates serve the opposite use case: SE keys backing operations a human authorises.
-They are capabilities, not a tax on SE keys.
+They are capabilities rather than requirements.
 
 ### 8.4 Scoping: team access group rather than code requirement (F19)
 
@@ -955,7 +955,7 @@ anchor trusted                          MATCH    MATCH    MATCH
 The second row is a failure in the opposite direction: naming the team CA through
 `certificate root` matches nothing, because `root` denotes the last certificate in the
 chain. A pin that silently matches nothing is as damaging as one that matches everything,
-and it is not evident on review.
+and the failure is not evident on review.
 
 Confirmed against real keychain ACLs rather than the requirement evaluator alone
 (`./run-acl-tiered.sh`), since the two have been observed to disagree:
