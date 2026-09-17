@@ -257,6 +257,26 @@ Both are team-level and stable across certificate and binary rotation, which is 
 survives renewal. Where the account is in use, the leaf is issued under the Developer ID
 identity so that one certificate serves both mechanisms.
 
+The two mechanisms draw on different certificate paths, and only one of them involves a CA
+you operate:
+
+- **Recommended path (Secure Enclave, access group).** The leaf is a Developer ID certificate.
+  Access is granted by the `keychain-access-groups` entitlement, and that entitlement is
+  granted by the **provisioning profile**, not by the certificate: the profile carries
+  `"TeamIdentifier" => [ "TEAMID" ]` and grants the prefix `TEAMID.*`, and AMFI verifies the
+  profile, the Apple-anchored chain and the signing certificate together (§3.3). **No
+  privately operated CA is involved anywhere on this path.**
+- **Alternative path (ACL, code requirement).** A code requirement needs an anchor, so this
+  path needs either a Developer ID certificate pinned through `OU`, or a privately operated
+  CA — the latter only where per-application granularity or a leaf-hash pin is wanted, since a
+  root under local control is stable indefinitely (EVIDENCE §9.4).
+
+The hierarchy above is therefore the **alternative** path's structure. Adopting a Developer ID
+certificate on the recommended path does not replace the team CA with an Apple-issued one; it
+removes the CA from that path altogether. Correspondingly, the only pin form that does not
+survive renewal is `certificate leaf = H"…"` (EVIDENCE §9.4), which is the form to avoid on the
+alternative path.
+
 ---
 
 ## 5. Key scoping
