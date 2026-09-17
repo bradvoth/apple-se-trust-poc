@@ -1,18 +1,18 @@
 # Evidence
 
-Measurements supporting `README.md`. That document states what should be built and why;
-this one records the results, including negative results and platform behaviour that
-constrains the design.
+Measurements supporting `README.md` and `ALT-ACL-PATH.md`. Those documents state what should be
+built and why; this one records the results, including negative results and platform behaviour
+that constrains the design.
 
 All measurements were taken on macOS 26.6.2 (build 25G83), arm64, OpenSSL 3.6.4, with
 command line tools only. None required `sudo`; the two items that do are listed in
-`README.md` §7 and are not treated as established anywhere below.
+`ALT-ACL-PATH.md` §6 and are not treated as established anywhere below.
 
 Results marked `(measured)`, and result blocks introduced by `Measured`, are reproduced by
 the named script. Every script listed under §12 is expected to pass from a clean machine.
 
 Sections are ordered so that later ones extend or qualify earlier ones. Findings referenced as
-F1–F19 are tabulated in `README.md` §2, each marked with its basis.
+F1–F20 are tabulated in `README.md` §2, each marked with its basis and the design it bears on.
 
 Two classes of evidence appear below and they are not equivalent. **Measured** results are
 reproduced by the scripts listed under §12. **Documented or decoded** results come from vendor
@@ -97,7 +97,7 @@ pin CA1 by subject CN        .        .     MATCH   MATCH   .
 `anchor trusted` matches every signed caller under `SecStaticCodeCheckValidity`. The same
 requirement stored in a keychain ACL denies every caller. The two evaluators have been
 observed to disagree, which is the reason the tiered-PKI matrices in §10 were confirmed
-against real ACLs rather than the evaluator alone. See `README.md` §7 for the unresolved
+against real ACLs rather than the evaluator alone. See `ALT-ACL-PATH.md` §6 for the unresolved
 cause and the procedure to settle it.
 
 ---
@@ -300,11 +300,11 @@ dialog to someone who holds the keychain password, and on a workstation that pas
 normally the logged-in user's own. It **is** a boundary against a caller that cannot obtain
 that credential, or that has no user present to prompt. The credential
 requirement also means the equivalent prompt in the System keychain should demand
-administrator credentials, which is unmeasured (`README.md` §7 item 1).
+administrator credentials, which is unmeasured (`ALT-ACL-PATH.md` §6 item 1).
 
 The prompt path belongs to the ACL entry, so it applies to whoever that entry names: the
 approval route is a property of the entry, not of a particular caller, and cannot be avoided by
-changing which binary the entry names (`README.md` §6.5).
+changing which binary the entry names (`README.md` §6.4).
 
 ### 4.2 A mitigation that does not work
 
@@ -356,7 +356,7 @@ It is a property that has to be built in deliberately. `SecAccessCreate`'s defau
 
 `ExportClear` and `ExportWrapped` are present by default. The keys in this repository escape that
 only because `mkkeyreq` strips the defaults and adds a Sign/Decrypt entry explicitly
-(`README.md` §6.3). A key built without that step silently grants export, and a code-identity pin
+(`ALT-ACL-PATH.md` §5.2). A key built without that step silently grants export, and a code-identity pin
 does not change it.
 
 Even with export rights absent, the key material remains in the keychain container, and a
@@ -456,7 +456,7 @@ is not sufficient.
 
 This table describes the keychain item **on an unmanaged machine**. It was the basis of an
 earlier claim that a local administrator cannot be constrained at all, which was wrong; see
-§6.4, and `README.md` §6.2 for the corrected model.
+§6.4, and `README.md` §6.4 for the corrected model.
 
 | actor | outcome for the keychain item itself |
 |---|---|
@@ -557,8 +557,7 @@ Neither was measured. Both are reasoning from documentation, and are labelled as
 
 
 The question of whether the *use* prompt for a System-keychain item is admin-gated is
-unresolved and is the highest-value remaining measurement; see `README.md` §7 and
-Appendix A.
+unresolved and is the highest-value remaining measurement; see `ALT-ACL-PATH.md` §6 and §6.1.
 
 ---
 
