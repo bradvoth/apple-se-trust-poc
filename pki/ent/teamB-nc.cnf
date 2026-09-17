@@ -1,0 +1,23 @@
+[ req ]
+default_bits        = 3072
+prompt              = no
+distinguished_name  = dn
+x509_extensions     = v3_intermediate
+
+[ dn ]
+CN = POC Team B Intermediate CA (name constrained)
+O  = POC Enterprise
+C  = US
+
+# The intermediate is constrained to the TEAMB branch of the DN space. A compliant
+# verifier must then reject any leaf it issues carrying a different OU, which is the
+# defence against a team CA *accidentally* issuing into another team's namespace.
+[ v3_intermediate ]
+basicConstraints       = critical, CA:TRUE, pathlen:0
+keyUsage               = critical, keyCertSign, cRLSign
+subjectKeyIdentifier   = hash
+authorityKeyIdentifier = keyid, issuer
+nameConstraints        = critical, permitted;dirName:nameconstraint
+
+[ nameconstraint ]
+OU = TEAMB

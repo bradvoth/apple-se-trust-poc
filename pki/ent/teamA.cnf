@@ -1,0 +1,20 @@
+[ req ]
+default_bits        = 3072
+prompt              = no
+distinguished_name  = dn
+x509_extensions     = v3_intermediate
+
+[ dn ]
+CN = POC Team A Intermediate CA
+O  = POC Enterprise
+C  = US
+
+# A team CA: it may sign leaves, but no further CAs (pathlen:0).
+#
+# Note there is deliberately NO nameConstraints here. Adding one on OU does not work
+# with Apple's DN ordering -- see pki/ent/teamB-nc.cnf and run-nameconstraints.sh.
+[ v3_intermediate ]
+basicConstraints       = critical, CA:TRUE, pathlen:0
+keyUsage               = critical, keyCertSign, cRLSign
+subjectKeyIdentifier   = hash
+authorityKeyIdentifier = keyid, issuer

@@ -1,0 +1,18 @@
+[ req ]
+default_bits        = 3072
+prompt              = no
+distinguished_name  = dn
+x509_extensions     = v3_ca
+
+[ dn ]
+CN = POC Enterprise Root
+O  = POC Enterprise
+C  = US
+
+# Path length 1: this root may have ONE level of sub-CA below it, so the team
+# intermediates cannot themselves issue further CAs. This is the constraint that
+# keeps a compromised team CA from minting its own hierarchy.
+[ v3_ca ]
+basicConstraints       = critical, CA:TRUE, pathlen:1
+keyUsage               = critical, keyCertSign, cRLSign, digitalSignature
+subjectKeyIdentifier   = hash

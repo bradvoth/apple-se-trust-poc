@@ -1,0 +1,15 @@
+[ req ]
+default_bits        = 3072
+prompt              = no
+distinguished_name  = dn
+x509_extensions     = v3_ca
+
+[ dn ]
+CN = POC Private Root CA 1
+O  = POC Apple Signing
+C  = US
+
+[ v3_ca ]
+basicConstraints       = critical, CA:TRUE, pathlen:0
+keyUsage               = critical, keyCertSign, cRLSign, digitalSignature
+subjectKeyIdentifier   = hash
