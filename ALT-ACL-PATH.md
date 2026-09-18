@@ -7,16 +7,16 @@ Developer account is unavailable. It is kept because it is reachable in that cas
 measurements taken against it are the negative results that support the recommendation, but it is
 not developed alongside the recommendation and nothing in `README.md` depends on it.
 
-Read `README.md` first. Findings are tabulated once, in `README.md` §2, and are cited here by ID;
+Read `README.md` first. Findings are tabulated once, in `README.md` Appendix A, and are cited here by ID;
 the measurements behind them are in `EVIDENCE.md`. Both classes of evidence are used, as in
-`README.md`: **measured** results are reproduced by a script in this repository, and
+`README.md` Appendix B: **measured** results are reproduced by a script in this repository, and
 **documented or decoded** results come from vendor documentation or from artifacts such as
 provisioning profiles.
 
 All measurements were taken on macOS 26.6.2 (build 25G83), arm64, OpenSSL 3.6.4, command line
 tools only.
 
-### Terminology (in addition to `README.md`)
+### Terminology (in addition to `README.md` Appendix C)
 
 | term | meaning |
 |---|---|
@@ -45,10 +45,10 @@ pinned to a code requirement instead:
 Two controls from `README.md` are required on this path as well, and one of them carries more
 weight here:
 
-- **Hardened runtime with library validation** (`README.md` §6.3). A code-identity pin is
+- **Hardened runtime with library validation** (`README.md` §2.5). A code-identity pin is
   ineffective against injected code without it (F7, EVIDENCE §7). The recommended design has no
   per-binary pin, so the control is primary there; here it is defence in depth behind the pin.
-- **The management plane** (`README.md` §1.1 step 5, §6.4). A local administrator can satisfy
+- **The management plane** (`README.md` §1.1 step 5, §3.7). A local administrator can satisfy
   `system.keychain.modify` and rewrite the ACL, and can recover the key material from the
   container, so on this path the management plane is the only control that bounds an
   administrator at all (F4, F13, F14; §5.3).
@@ -114,10 +114,10 @@ It is also what Apple's own designated requirements read. A code requirement nee
 this path needs either a Developer ID certificate pinned through `OU`, or a privately operated CA
 — the latter only where per-application granularity or a leaf-hash pin is wanted, since a root
 under local control is stable indefinitely (EVIDENCE §9.4). Where a Developer ID certificate is
-used, the same leaf serves both the `OU` pin and the account mechanics in `README.md` §3.
+used, the same leaf serves both the `OU` pin and the account mechanics in `README.md` §2.1.
 
 The hierarchy above is this path's structure. The recommended design does not replace a team CA
-with an Apple-issued one; it removes the CA from that design altogether (`README.md` §4).
+with an Apple-issued one; it removes the CA from that design altogether (`README.md` §3.3).
 
 The pin forms, compared by what invalidates them:
 
@@ -312,7 +312,7 @@ The keychain ACL, considered alone, is defeated by an administrator who can sati
 
 An administrator on a supervised, managed Mac cannot remove the management plane, and the
 management plane can gate the very authorization an ACL change requires. The boundary is the
-enrolment, not the administrator bit. `README.md` §6.4 tabulates the controls that establish that
+enrolment, not the administrator bit. `README.md` §2.6 tabulates the controls that establish that
 boundary; they are device-level and apply here unchanged.
 
 **Endpoint agents close the gap identified in §5.1.** The ACL is gated by an authorization right
@@ -336,7 +336,7 @@ recovery lock and the constraints.
 
 Items not established here. The first two could not be measured for want of administrator rights;
 the last is a documentation gap. The items that are not established about the recommended design
-are in `README.md` §7.
+are in `README.md` §3.9.
 
 1. **Whether the System-keychain use prompt demands administrator credentials.** For a file
    keychain the prompt asks for that keychain's password and supplying it grants access
@@ -382,7 +382,7 @@ sudo security add-trusted-cert -d -r trustRoot -p codeSign \
 
 The findings this path rests on are F1–F6, F10–F12 and F14–F17, together with F20 for the
 trust-settings route and F7 and F13 for the two controls it shares with the recommended design;
-each is marked `alternative` or `both` in `README.md` §2.
+each is marked `alternative` or `both` in `README.md` Appendix A.
 
 They are reproduced by `run-matrix.sh`, `run-aclstruct.sh`, `run-prompt-approval.sh`,
 `run-extraction.sh`, `run-reqmatrix.sh`, `run-tiered.sh`, `run-acl-tiered.sh`,

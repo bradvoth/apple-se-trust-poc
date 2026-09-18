@@ -12,7 +12,7 @@ Results marked `(measured)`, and result blocks introduced by `Measured`, are rep
 the named script. Every script listed under §12 is expected to pass from a clean machine.
 
 Sections are ordered so that later ones extend or qualify earlier ones. Findings referenced as
-F1–F20 are tabulated in `README.md` §2, each marked with its basis and the design it bears on.
+F1–F20 are tabulated in `README.md` Appendix A, each marked with its basis and the design it bears on.
 
 Two classes of evidence appear below and they are not equivalent. **Measured** results are
 reproduced by the scripts listed under §12. **Documented or decoded** results come from vendor
@@ -304,7 +304,7 @@ administrator credentials, which is unmeasured (`ALT-ACL-PATH.md` §6 item 1).
 
 The prompt path belongs to the ACL entry, so it applies to whoever that entry names: the
 approval route is a property of the entry, not of a particular caller, and cannot be avoided by
-changing which binary the entry names (`README.md` §6.4).
+changing which binary the entry names (`README.md` §3.7).
 
 ### 4.2 A mitigation that does not work
 
@@ -456,7 +456,7 @@ is not sufficient.
 
 This table describes the keychain item **on an unmanaged machine**. It was the basis of an
 earlier claim that a local administrator cannot be constrained at all, which was wrong; see
-§6.4, and `README.md` §6.4 for the corrected model.
+§6.4, and `README.md` §3.7 for the corrected model.
 
 | actor | outcome for the keychain item itself |
 |---|---|
@@ -712,7 +712,7 @@ generic password on that path returns `-34018`:
 ```
 
 The two properties the design depends on — that binaries sharing a group reach the same key, and
-that a foreign team cannot declare the prefix — are therefore unverified. `README.md` §7.1 gives
+that a foreign team cannot declare the prefix — are therefore unverified. `README.md` §2.7 gives
 the test order.
 
 ### 8.5 SE access control has no code-identity field (F8)
